@@ -1,0 +1,137 @@
+#include <LiquidCrystal.h>
+#include <Keypad.h>
+
+// LCD-Pinzuordnung
+LiquidCrystal lcd(50, 51, 52, 53, A8, A9);
+
+// Konstanten
+const String correctPassword = "7355608";  // Richtiges Passwort
+const int resetPin = 43;                   // Pin für Reset-Taste
+const int testPin = 42;                    // Pin für Test-Schalter
+const int greenLedPins[] = {2, 4, 6, 8, 10, 12, A0, A2, A4, A6};
+const int redLedPins[] = {3, 5, 7, 9, 11, 13, A1, A3, A5, A7};
+
+// Keypad-Konfiguration
+const byte ROWS = 4;                      // 4 Zeilen
+const byte COLS = 3;                      // 3 Spalten
+char keys[ROWS][COLS] = {
+  {'1', '2', '3'},
+  {'4', '5', '6'},
+  {'7', '8', '9'},
+  {'*', '0', '#'}
+};
+
+byte rowPins[ROWS] = {49, 44, 45, 47};    // Zeilenpins des Keypads
+byte colPins[COLS] = {48, A10, 46};       // Spaltenpins des Keypads
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+// Variablen
+bool testMode = false;
+bool gameStarted = false;
+
+void setup() {
+  Serial.begin(9600);
+  
+  // LEDs initialisieren
+  for (int i = 0; i < 10; i++) {
+    pinMode(greenLedPins[i], OUTPUT);
+    pinMode(redLedPins[i], OUTPUT);
+    digitalWrite(greenLedPins[i], LOW);
+    digitalWrite(redLedPins[i], HIGH);  // Rot an, weil Buchsen nicht verbunden sind
+  }
+
+  // Test- und Reset-Schalter
+  pinMode(testPin, INPUT_PULLUP);
+  pinMode(resetPin, INPUT_PULLUP);
+
+  // LCD initialisieren
+  lcd.begin(16, 2);
+  lcd.print("Setup gestartet");
+  Serial.println("System Setup gestartet.");
+  delay(1000);
+}
+
+void loop() {
+  // Testmodus aktivieren, falls Schalter gedrückt
+  if (digitalRead(testPin) == LOW) {
+    testMode = true;
+    activateTestMode();
+  } else {
+    testMode = false;
+    lcd.clear();
+  }
+
+  // Passwort-Eingabe
+  if (!gameStarted) {
+    lcd.clear();
+    lcd.print("Enter Password:");
+    String inputPassword = readPasswordFromKeypad();
+    if (inputPassword == correctPassword) {
+      lcd.clear();
+      lcd.print("Password correct");
+      Serial.println("Password korrekt eingegeben.");
+      delay(1000);
+      gameStarted = true;
+      startGame();
+    } else {
+      lcd.clear();
+      lcd.print("Wrong Code");
+      Serial.println("Falsches Passwort eingegeben.");
+      delay(1000);
+      resetSystem();  // System zurücksetzen
+    }
+  }
+}
+
+void activateTestMode() {
+  lcd.clear();
+  lcd.print("Test Mode");
+  Serial.println("Testmodus aktiviert. Alle LEDs eingeschaltet.");
+  for (int i = 0; i < 10; i++) {
+    digitalWrite(greenLedPins[i], HIGH);
+    digitalWrite(redLedPins[i], HIGH);
+  }
+  delay(1000);
+}
+
+void resetSystem() {
+  lcd.clear();
+  lcd.print("Resetting...");
+  Serial.println("System wird zurückgesetzt.");
+  delay(1000);
+  asm volatile ("jmp 0");  // Reset durch Sprung zur Startadresse
+}
+
+String readPasswordFromKeypad() {
+  String password = "";
+  lcd.setCursor(0, 1);  // Zweite Zeile für die Eingabe
+  Serial.println("Passworteingabe gestartet.");
+  while (true) {
+    char key = keypad.getKey();
+    if (key) {
+      Serial.print("Eingabe: ");
+      Serial.println(key);
+
+      if (key == '#') {  // Bestätigungstaste
+        Serial.println("Passworteingabe abgeschlossen.");
+        break;
+      } else if (key == '*') {  // Zurücksetzen der Eingabe
+        password = "";
+        lcd.setCursor(0, 1);
+        lcd.print("                ");  // Eingabe löschen
+        lcd.setCursor(0, 1);
+      } else {
+        password += key;
+        lcd.print(key);  // Eingegebenes Zeichen auf LCD anzeigen
+      }
+    }
+  }
+  return password;
+}
+
+void startGame() {
+  lcd.clear();
+  lcd.print("Game Started!");
+  Serial.println("Spiel gestartet.");
+  // Hier startet der Spielablauf
+}
